@@ -128,6 +128,7 @@
     .serp-item:last-child { border-bottom: none; }
     .serp-pos { display: inline-block; width: 28px; height: 28px; line-height: 28px; text-align: center; background: var(--bg3); border-radius: 6px; font-weight: 700; font-size: 13px; margin-right: 12px; }
     .serp-item.highlight { background: rgba(249,115,22,0.08); border-radius: 8px; padding: 10px; margin: -4px -10px; }
+    tr.highlight { background: rgba(249,115,22,0.06); }
     .serp-title { font-weight: 600; }
     .serp-url { font-size: 12px; color: var(--green); }
     .serp-desc { font-size: 13px; color: var(--text2); margin-top: 4px; }
@@ -148,6 +149,7 @@
       <button data-page="discovery">Discovery</button>
       <button data-page="serp">SERP</button>
       <button data-page="ai">AI Visibility</button>
+      <button data-page="reddit">Reddit</button>
       <button data-page="costs">Costs</button>
       <button data-page="settings">Settings</button>
     </nav>
@@ -201,7 +203,7 @@
       activePage = page;
       const c = $('#content');
       c.innerHTML = '<div class="loading">Loading...</div>';
-      const pages = { ranks: loadRanks, movers: loadMovers, discovery: loadDiscovery, serp: loadSerp, ai: loadAI, costs: loadCosts, settings: loadSettings };
+      const pages = { ranks: loadRanks, movers: loadMovers, discovery: loadDiscovery, serp: loadSerp, ai: loadAI, reddit: loadReddit, costs: loadCosts, settings: loadSettings };
       if (pages[page]) pages[page]();
     }
 
@@ -237,7 +239,7 @@
 
       $('#content').innerHTML = `
         <div class="flex-between mb">
-          <h2 style="color:var(--text)">Keyword Rankings — ${currentSite.name}</h2>
+          <h2 style="color:var(--text)">Keyword Rankings</h2>
           <button class="btn" onclick="runAllChecks()">🔄 Check All Keywords</button>
         </div>
         <div class="card">
@@ -321,7 +323,7 @@
       }
 
       $('#content').innerHTML = `
-        <h2 style="color:var(--text);margin-bottom:20px">Rising & Falling Keywords — ${currentSite.name}</h2>
+        <h2 style="color:var(--text);margin-bottom:20px">Rising & Falling Keywords</h2>
         <div class="grid grid-2">
           <div class="card"><h2>🟢 Rising</h2>${moverRows(rising)}</div>
           <div class="card"><h2>🔴 Falling</h2>${moverRows(falling)}</div>
@@ -344,7 +346,7 @@
 
       $('#content').innerHTML = `
         <div class="flex-between mb">
-          <h2 style="color:var(--text)">Keyword Discovery — ${currentSite.name}</h2>
+          <h2 style="color:var(--text)">Keyword Discovery</h2>
           <button class="btn" onclick="runDiscovery()">🔍 Run Discovery</button>
         </div>
         <div class="card">
@@ -369,7 +371,7 @@
       let kwOptions = keywords.map(k => `<option value="${k.id}">${k.keyword}</option>`).join('');
       
       $('#content').innerHTML = `
-        <h2 style="color:var(--text);margin-bottom:20px">SERP Snapshot — ${currentSite.name}</h2>
+        <h2 style="color:var(--text);margin-bottom:20px">SERP Snapshot</h2>
         <div class="card">
           <div class="flex mb">
             <select id="serpKw" style="max-width:300px">${kwOptions}</select>
@@ -427,7 +429,7 @@
       </tr>`).join('');
 
       $('#content').innerHTML = `
-        <h2 style="color:var(--text);margin-bottom:20px">AI Visibility — ${currentSite.name}</h2>
+        <h2 style="color:var(--text);margin-bottom:20px">AI Visibility</h2>
         <div class="grid grid-2">
           <div class="card">
             <h2>Test Queries</h2>
@@ -533,6 +535,8 @@
             <input id="s-disc-cron" value="${settings.discovery_cron || '0 7 * * 1'}" class="mb">
             <label style="font-size:12px;color:var(--text2)">AI Visibility Cron</label>
             <input id="s-ai-cron" value="${settings.ai_visibility_cron || '0 8 * * 1'}" class="mb">
+            <label style="font-size:12px;color:var(--text2)">Reddit Check Cron</label>
+            <input id="s-reddit-cron" value="${settings.reddit_check_cron || '0 */6 * * *'}" class="mb">
             <label style="font-size:12px;color:var(--text2)">Monthly Budget Alert ($)</label>
             <input id="s-budget" value="${settings.budget_alert || '50'}" type="number" class="mb">
             <button class="btn" onclick="saveSchedule()">Save Schedule</button>
@@ -563,6 +567,7 @@
         rank_check_cron: $('#s-rank-cron').value,
         discovery_cron: $('#s-disc-cron').value,
         ai_visibility_cron: $('#s-ai-cron').value,
+        reddit_check_cron: $('#s-reddit-cron').value,
         budget_alert: $('#s-budget').value
       }});
       alert('Schedule saved & scheduler restarted!');
@@ -600,6 +605,122 @@
     async function deleteKeyword(id) {
       await api(`/keywords/${id}`, { method: 'DELETE' });
       loadSettings();
+    }
+
+    // ============ REDDIT MONITOR PAGE ============
+    let redditFilter = 'all'; // all, unseen, opportunities
+    async function loadReddit() {
+      if (!currentSite) return $('#content').innerHTML = '<div class="empty">No sites configured.</div>';
+      
+      const keywords = await api(`/sites/${currentSite.id}/reddit-keywords`);
+      const params = redditFilter === 'unseen' ? '?unseen=1' : redditFilter === 'opportunities' ? '?opportunities=1' : '';
+      const mentions = await api(`/sites/${currentSite.id}/reddit-mentions${params}`);
+
+      const kwRows = keywords.map(k => {
+        let subs = [];
+        try { subs = JSON.parse(k.subreddits); } catch {}
+        return `<tr>
+          <td><strong>${k.keyword}</strong></td>
+          <td>${subs.length ? subs.map(s => '<span class="tag">r/' + s + '</span>').join(' ') : '<span class="neutral">all</span>'}</td>
+          <td><button class="btn btn-sm btn-danger" onclick="deleteRedditKw(${k.id})">✕</button></td>
+        </tr>`;
+      }).join('');
+
+      const mentionRows = mentions.map(m => {
+        const age = timeAgo(m.created_utc);
+        const oppClass = m.is_opportunity ? 'highlight' : '';
+        const seenStyle = m.seen ? 'opacity:0.5;' : '';
+        return `<tr style="${seenStyle}" class="${oppClass}">
+          <td>
+            <a href="${m.url}" target="_blank" style="color:var(--text);text-decoration:none;font-weight:${m.is_opportunity ? '700' : '400'}">
+              ${m.title}
+            </a>
+            ${m.is_opportunity ? '<span class="badge badge-orange" style="margin-left:6px">🎯 Opportunity</span>' : ''}
+          </td>
+          <td><span class="tag">r/${m.subreddit}</span></td>
+          <td><span class="tag">${m.matched_keyword}</span></td>
+          <td>${m.score} ⬆ / ${m.num_comments} 💬</td>
+          <td style="font-size:12px;color:var(--text2)">${age}</td>
+          <td>
+            ${!m.seen ? `<button class="btn btn-sm btn-ghost" onclick="markSeen(${m.id})">✓</button>` : '<span class="neutral">seen</span>'}
+          </td>
+        </tr>`;
+      }).join('');
+
+      $('#content').innerHTML = `
+        <div class="flex-between mb">
+          <h2 style="color:var(--text)">Reddit Monitor</h2>
+          <div class="flex">
+            <button class="btn btn-sm ${redditFilter==='all'?'':'btn-ghost'}" onclick="redditFilter='all';loadReddit()">All</button>
+            <button class="btn btn-sm ${redditFilter==='unseen'?'':'btn-ghost'}" onclick="redditFilter='unseen';loadReddit()">Unseen</button>
+            <button class="btn btn-sm ${redditFilter==='opportunities'?'':'btn-ghost'}" onclick="redditFilter='opportunities';loadReddit()">🎯 Opportunities</button>
+            <button class="btn" onclick="runRedditCheck()">🔄 Check Now</button>
+            <button class="btn btn-ghost" onclick="markAllSeen()">Mark All Seen</button>
+          </div>
+        </div>
+        <div class="grid grid-2">
+          <div class="card">
+            <h2>Monitored Keywords</h2>
+            <div class="flex mb">
+              <input id="newRedditKw" placeholder="Keyword to monitor...">
+              <input id="newRedditSubs" placeholder="Subreddits (comma-separated)" style="max-width:200px">
+              <button class="btn btn-sm" onclick="addRedditKw()">Add</button>
+            </div>
+            ${keywords.length ? `<table><thead><tr><th>Keyword</th><th>Subreddits</th><th></th></tr></thead><tbody>${kwRows}</tbody></table>` : '<div class="empty">No Reddit keywords configured</div>'}
+          </div>
+          <div class="card stat-card">
+            <div class="stat-val">${mentions.length}</div>
+            <div class="stat-label">Mentions Found</div>
+            <div style="margin-top:12px">
+              <span class="badge badge-orange">${mentions.filter(m=>m.is_opportunity).length} opportunities</span>
+              <span class="badge badge-green">${mentions.filter(m=>!m.seen).length} unseen</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Recent Mentions</h2>
+          ${mentions.length ? `<table><thead><tr><th>Post</th><th>Subreddit</th><th>Keyword</th><th>Engagement</th><th>Age</th><th></th></tr></thead><tbody>${mentionRows}</tbody></table>` : '<div class="empty">No mentions yet. Add keywords and run a check.</div>'}
+        </div>
+      `;
+    }
+
+    function timeAgo(utcSeconds) {
+      if (!utcSeconds) return '—';
+      const diff = Math.floor(Date.now() / 1000 - utcSeconds);
+      if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+      return Math.floor(diff / 86400) + 'd ago';
+    }
+
+    async function addRedditKw() {
+      const keyword = $('#newRedditKw').value.trim();
+      if (!keyword) return;
+      const subsStr = ($('#newRedditSubs')?.value || '').trim();
+      const subreddits = subsStr ? subsStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+      await api(`/sites/${currentSite.id}/reddit-keywords`, { method: 'POST', body: { keyword, subreddits } });
+      loadReddit();
+    }
+
+    async function deleteRedditKw(id) {
+      await api(`/reddit-keywords/${id}`, { method: 'DELETE' });
+      loadReddit();
+    }
+
+    async function markSeen(id) {
+      await api(`/reddit-mentions/${id}/seen`, { method: 'PUT' });
+      loadReddit();
+    }
+
+    async function markAllSeen() {
+      await api('/reddit-mentions/mark-all-seen', { method: 'PUT', body: { siteId: currentSite.id } });
+      loadReddit();
+    }
+
+    async function runRedditCheck() {
+      const btn = event.target;
+      btn.disabled = true; btn.textContent = '⏳ Checking...';
+      await api('/run/reddit-check', { method: 'POST' });
+      loadReddit();
     }
 
     init();

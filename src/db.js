@@ -136,6 +136,31 @@ async function initSync() {
       created_at TEXT DEFAULT (datetime('now')),
       UNIQUE(site_id, query)
     );
+    CREATE TABLE IF NOT EXISTS reddit_keywords (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      site_id INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+      keyword TEXT NOT NULL,
+      subreddits TEXT DEFAULT '[]',
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(site_id, keyword)
+    );
+    CREATE TABLE IF NOT EXISTS reddit_mentions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      site_id INTEGER NOT NULL,
+      keyword_id INTEGER NOT NULL REFERENCES reddit_keywords(id) ON DELETE CASCADE,
+      post_id TEXT NOT NULL,
+      title TEXT,
+      subreddit TEXT,
+      url TEXT,
+      score INTEGER DEFAULT 0,
+      num_comments INTEGER DEFAULT 0,
+      author TEXT,
+      created_utc INTEGER,
+      is_opportunity INTEGER DEFAULT 0,
+      seen INTEGER DEFAULT 0,
+      found_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(post_id)
+    );
   `);
 
   db.exec(`
@@ -143,6 +168,8 @@ async function initSync() {
     CREATE INDEX IF NOT EXISTS idx_keywords_site ON keywords(site_id);
     CREATE INDEX IF NOT EXISTS idx_api_costs_date ON api_costs(created_at);
     CREATE INDEX IF NOT EXISTS idx_ai_visibility_site ON ai_visibility(site_id, checked_at);
+    CREATE INDEX IF NOT EXISTS idx_reddit_mentions_site ON reddit_mentions(site_id, found_at);
+    CREATE INDEX IF NOT EXISTS idx_reddit_keywords_site ON reddit_keywords(site_id);
   `);
 
   const defaults = {
@@ -152,7 +179,8 @@ async function initSync() {
     rank_check_cron: '0 6 * * *',
     discovery_cron: '0 7 * * 1',
     ai_visibility_cron: '0 8 * * 1',
-    budget_alert: '50'
+    budget_alert: '50',
+    reddit_check_cron: '0 */6 * * *'
   };
 
   const insertSetting = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');

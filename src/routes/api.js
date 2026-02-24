@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { runRankChecks, runKeywordDiscovery } = require('../scheduler');
+const { runRankChecks, runKeywordDiscovery, runRedditChecks } = require('../scheduler');
 const { checkKeywordRank, getKeywordSuggestions } = require('../dataforseo');
 
 // ============ SITES ============
@@ -242,6 +242,67 @@ router.post('/keywords/:id/check', async (req, res) => {
       'INSERT INTO rank_checks (keyword_id, position, url, serp_data) VALUES (?, ?, ?, ?)'
     ).run(kw.id, result.position, result.url, JSON.stringify(result.serpData));
     res.json({ position: result.position, url: result.url });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ============ REDDIT MONITOR ============
+
+router.get('/sites/:siteId/reddit-keywords', (req, res) => {
+  res.json(db.prepare('SELECT * FROM reddit_keywords WHERE site_id = ? ORDER BY keyword').all(req.params.siteId));
+});
+
+router.post('/sites/:siteId/reddit-keywords', (req, res) => {
+  const { keyword, subreddits } = req.body;
+  if (!keyword) return res.status(400).json({ error: 'keyword required' });
+  try {
+    const subs = JSON.stringify(subreddits || []);
+    const r = db.prepare('INSERT INTO reddit_keywords (site_id, keyword, subreddits) VALUES (?, ?, ?)').run(req.params.siteId, keyword, subs);
+    res.json({ id: r.lastInsertRowid, site_id: +req.params.siteId, keyword, subreddits: subs });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+router.delete('/reddit-keywords/:id', (req, res) => {
+  db.prepare('DELETE FROM reddit_mentions WHERE keyword_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM reddit_keywords WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
+});
+
+router.get('/sites/:siteId/reddit-mentions', (req, res) => {
+  const limit = parseInt(req.query.limit) || 100;
+  const unseen = req.query.unseen === '1' ? 'AND rm.seen = 0' : '';
+  const opOnly = req.query.opportunities === '1' ? 'AND rm.is_opportunity = 1' : '';
+  const rows = db.prepare(`
+    SELECT rm.*, rk.keyword as matched_keyword
+    FROM reddit_mentions rm
+    JOIN reddit_keywords rk ON rk.id = rm.keyword_id
+    WHERE rm.site_id = ? ${unseen} ${opOnly}
+    ORDER BY rm.created_utc DESC
+    LIMIT ?
+  `).all(req.params.siteId, limit);
+  res.json(rows);
+});
+
+router.put('/reddit-mentions/:id/seen', (req, res) => {
+  db.prepare('UPDATE reddit_mentions SET seen = 1 WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
+});
+
+router.put('/reddit-mentions/mark-all-seen', (req, res) => {
+  const { siteId } = req.body;
+  if (siteId) {
+    db.prepare('UPDATE reddit_mentions SET seen = 1 WHERE site_id = ?').run(siteId);
+  }
+  res.json({ ok: true });
+});
+
+router.post('/run/reddit-check', async (req, res) => {
+  try {
+    await runRedditChecks();
+    res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

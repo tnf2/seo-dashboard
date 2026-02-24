@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const db = require('./db');
 const { checkKeywordRank, getKeywordSuggestions } = require('./dataforseo');
+const { runRedditChecks } = require('./reddit');
 
 let jobs = {};
 
@@ -99,6 +100,12 @@ function start() {
     });
     console.log(`[Scheduler] AI visibility scheduled: ${aiCron}`);
   }
+
+  const redditCron = getSetting('reddit_check_cron') || '0 */6 * * *';
+  if (cron.validate(redditCron)) {
+    jobs.reddit = cron.schedule(redditCron, runRedditChecks);
+    console.log(`[Scheduler] Reddit checks scheduled: ${redditCron}`);
+  }
 }
 
-module.exports = { start, runRankChecks, runKeywordDiscovery };
+module.exports = { start, runRankChecks, runKeywordDiscovery, runRedditChecks };
