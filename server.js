@@ -1,24 +1,35 @@
 const express = require('express');
 const path = require('path');
 const db = require('./src/db');
-const apiRoutes = require('./src/routes/api');
-const scheduler = require('./src/scheduler');
 
-const app = express();
-const PORT = process.env.PORT || 3456;
+async function main() {
+  // Initialize database (async sql.js load)
+  await db.initSync();
 
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+  const apiRoutes = require('./src/routes/api');
+  const scheduler = require('./src/scheduler');
 
-// API routes
-app.use('/api', apiRoutes);
+  const app = express();
+  const PORT = process.env.PORT || 3456;
 
-// SPA fallback
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+  app.use(express.json());
+  app.use(express.static(path.join(__dirname, 'public')));
 
-app.listen(PORT, () => {
-  console.log(`SEO Dashboard running at http://localhost:${PORT}`);
-  scheduler.start();
+  // API routes
+  app.use('/api', apiRoutes);
+
+  // SPA fallback
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  });
+
+  app.listen(PORT, () => {
+    console.log(`SEO Dashboard running at http://localhost:${PORT}`);
+    scheduler.start();
+  });
+}
+
+main().catch(err => {
+  console.error('Failed to start:', err);
+  process.exit(1);
 });
