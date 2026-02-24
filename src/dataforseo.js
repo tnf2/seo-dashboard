@@ -89,4 +89,36 @@ async function getKeywordSuggestions(keywords, locationCode = 2840) {
   })).filter(item => item.searchVolume > 0);
 }
 
-module.exports = { checkKeywordRank, getKeywordSuggestions, logCost };
+// Scan all ranked keywords for a domain
+async function scanRankedKeywords(domain) {
+  const body = [{
+    target: domain,
+    location_code: 2840,
+    language_code: 'en',
+    limit: 100
+  }];
+
+  const data = await apiCall('/dataforseo_labs/google/ranked_keywords/live', body);
+
+  // Log actual cost from response
+  const cost = data.cost || 0.05;
+  logCost('dataforseo_labs/ranked_keywords', cost);
+
+  if (!data.tasks?.[0]?.result?.[0]?.items) {
+    return { keywords: [], cost };
+  }
+
+  const items = data.tasks[0].result[0].items;
+  const keywords = items.map(item => ({
+    keyword: item.keyword_data?.keyword,
+    position: item.ranked_serp_element?.serp_item?.rank_absolute || null,
+    search_volume: item.keyword_data?.keyword_info?.search_volume || 0,
+    url: item.ranked_serp_element?.serp_item?.url || null,
+    competition: item.keyword_data?.keyword_info?.competition || null,
+    cpc: item.keyword_data?.keyword_info?.cpc || 0
+  })).filter(k => k.keyword);
+
+  return { keywords, cost };
+}
+
+module.exports = { checkKeywordRank, getKeywordSuggestions, scanRankedKeywords, logCost };

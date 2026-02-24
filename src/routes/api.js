@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { runRankChecks, runKeywordDiscovery, runRedditChecks } = require('../scheduler');
-const { checkKeywordRank, getKeywordSuggestions } = require('../dataforseo');
+const { checkKeywordRank, getKeywordSuggestions, scanRankedKeywords } = require('../dataforseo');
 
 // ============ SITES ============
 
@@ -242,6 +242,37 @@ router.post('/keywords/:id/check', async (req, res) => {
       'INSERT INTO rank_checks (keyword_id, position, url, serp_data) VALUES (?, ?, ?, ?)'
     ).run(kw.id, result.position, result.url, JSON.stringify(result.serpData));
     res.json({ position: result.position, url: result.url });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ============ SCAN SITE (Ranked Keywords) ============
+
+router.post('/sites/:siteId/scan', async (req, res) => {
+  const site = db.prepare('SELECT * FROM sites WHERE id = ?').get(req.params.siteId);
+  if (!site) return res.status(404).json({ error: 'site not found' });
+
+  try {
+    const { keywords, cost } = await scanRankedKeywords(site.domain);
+
+    let newCount = 0;
+    for (const kw of keywords) {
+      const r = db.prepare('INSERT OR IGNORE INTO keywords (site_id, keyword) VALUES (?, ?)').run(req.params.siteId, kw.keyword);
+      if (r.changes > 0) newCount++;
+      const kwRow = db.prepare('SELECT id FROM keywords WHERE site_id = ? AND keyword = ?').get(req.params.siteId, kw.keyword);
+      if (kwRow && kw.position) {
+        db.prepare('INSERT INTO rank_checks (keyword_id, position, url) VALUES (?, ?, ?)').run(kwRow.id, kw.position, kw.url);
+      }
+    }
+
+    res.json({
+      found: keywords.length,
+      newAdded: newCount,
+      alreadyTracked: keywords.length - newCount,
+      cost,
+      keywords
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

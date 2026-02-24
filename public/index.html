@@ -240,7 +240,10 @@
       $('#content').innerHTML = `
         <div class="flex-between mb">
           <h2 style="color:var(--text)">Keyword Rankings</h2>
-          <button class="btn" onclick="runAllChecks()">🔄 Check All Keywords</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn" onclick="scanSite()">🔍 Scan Site (~$0.05)</button>
+            <button class="btn" onclick="runAllChecks()">🔄 Check All Keywords</button>
+          </div>
         </div>
         <div class="card">
           <table>
@@ -301,6 +304,35 @@
       btn.disabled = true; btn.textContent = '⏳ Running...';
       await api('/run/rank-check', { method: 'POST' });
       loadRanks();
+    }
+
+    async function scanSite() {
+      if (!currentSite) return;
+      if (!confirm(`Scan "${currentSite.domain}" for all ranked keywords?\nEstimated cost: ~$0.05`)) return;
+      const btn = event.target;
+      btn.disabled = true; btn.textContent = '⏳ Scanning...';
+      try {
+        const result = await api(`/sites/${currentSite.id}/scan`, { method: 'POST' });
+        alert(`Found ${result.found} keywords, ${result.newAdded} new added, ${result.alreadyTracked} already tracked.\nCost: $${result.cost?.toFixed(4) || '?'}`);
+        loadRanks();
+      } catch (e) {
+        alert('Scan failed: ' + e.message);
+        btn.disabled = false; btn.textContent = '🔍 Scan Site (~$0.05)';
+      }
+    }
+
+    async function scanSiteById(siteId, domain) {
+      if (!confirm(`Scan "${domain}" for ranked keywords? (~$0.05)`)) return;
+      const btn = event.target;
+      btn.disabled = true; btn.textContent = '⏳...';
+      try {
+        const result = await api(`/sites/${siteId}/scan`, { method: 'POST' });
+        alert(`Found ${result.found} keywords, ${result.newAdded} new added.`);
+        loadSettings();
+      } catch (e) {
+        alert('Scan failed: ' + e.message);
+        btn.disabled = false; btn.textContent = '🔍 Scan';
+      }
     }
 
     // ============ MOVERS PAGE ============
@@ -505,7 +537,10 @@
           <div class="card">
             <div class="flex-between mb">
               <h2>🌐 ${site.name} (${site.domain})</h2>
-              <button class="btn btn-sm btn-danger" onclick="deleteSite(${site.id})">Delete Site</button>
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-sm" onclick="scanSiteById(${site.id}, '${site.domain.replace(/'/g,"\\'")}')">🔍 Scan</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteSite(${site.id})">Delete</button>
+              </div>
             </div>
             <div class="flex mb">
               <input id="newKw-${site.id}" placeholder="Add keyword...">
