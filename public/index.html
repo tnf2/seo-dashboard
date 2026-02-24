@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SEO Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --bg2: #1a1d27;
+      --bg3: #242836;
+      --accent: #f97316;
+      --accent2: #fb923c;
+      --green: #22c55e;
+      --red: #ef4444;
+      --text: #e2e8f0;
+      --text2: #94a3b8;
+      --border: #2d3348;
+      --radius: 12px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    header h1 { font-size: 20px; color: var(--accent); }
+    nav { display: flex; gap: 4px; }
+    nav button {
+      background: none;
+      border: none;
+      color: var(--text2);
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+    nav button:hover, nav button.active { background: var(--bg3); color: var(--text); }
+    nav button.active { color: var(--accent); }
+    .site-select {
+      margin-left: auto;
+      background: var(--bg3);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    main { max-width: 1400px; margin: 0 auto; padding: 24px; }
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 20px;
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .card h2 { font-size: 16px; color: var(--text2); margin-bottom: 16px; text-transform: uppercase; letter-spacing: 1px; font-weight: 500; }
+    .grid { display: grid; gap: 20px; }
+    .grid-2 { grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); }
+    .grid-4 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 10px 12px; color: var(--text2); font-weight: 500; font-size: 13px; border-bottom: 1px solid var(--border); }
+    td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 14px; }
+    tr:last-child td { border-bottom: none; }
+    .pos { font-weight: 700; font-size: 18px; }
+    .up { color: var(--green); }
+    .down { color: var(--red); }
+    .neutral { color: var(--text2); }
+    .arrow { font-size: 12px; margin-right: 4px; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-green { background: rgba(34,197,94,0.15); color: var(--green); }
+    .badge-red { background: rgba(239,68,68,0.15); color: var(--red); }
+    .badge-orange { background: rgba(249,115,22,0.15); color: var(--accent); }
+    .stat-card { text-align: center; padding: 20px; }
+    .stat-val { font-size: 32px; font-weight: 700; color: var(--accent); }
+    .stat-label { font-size: 13px; color: var(--text2); margin-top: 4px; }
+    input, select, textarea {
+      background: var(--bg3);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      width: 100%;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--accent); }
+    .btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .btn:hover { background: var(--accent2); }
+    .btn-sm { padding: 4px 10px; font-size: 12px; }
+    .btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); }
+    .btn-ghost:hover { color: var(--text); border-color: var(--text2); }
+    .btn-danger { background: var(--red); }
+    .btn-danger:hover { background: #dc2626; }
+    .flex { display: flex; align-items: center; gap: 8px; }
+    .flex-between { display: flex; justify-content: space-between; align-items: center; }
+    .mb { margin-bottom: 12px; }
+    .chart-container { position: relative; height: 300px; }
+    .serp-item { padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .serp-item:last-child { border-bottom: none; }
+    .serp-pos { display: inline-block; width: 28px; height: 28px; line-height: 28px; text-align: center; background: var(--bg3); border-radius: 6px; font-weight: 700; font-size: 13px; margin-right: 12px; }
+    .serp-item.highlight { background: rgba(249,115,22,0.08); border-radius: 8px; padding: 10px; margin: -4px -10px; }
+    .serp-title { font-weight: 600; }
+    .serp-url { font-size: 12px; color: var(--green); }
+    .serp-desc { font-size: 13px; color: var(--text2); margin-top: 4px; }
+    .empty { text-align: center; padding: 40px; color: var(--text2); }
+    .loading { text-align: center; padding: 20px; color: var(--text2); }
+    .hidden { display: none; }
+    .cost-bar { height: 6px; background: var(--bg3); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+    .cost-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.5s; }
+    .tag { display: inline-block; padding: 2px 8px; background: var(--bg3); border-radius: 6px; font-size: 12px; margin: 2px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📊 SEO Dashboard</h1>
+    <nav>
+      <button class="active" data-page="ranks">Rankings</button>
+      <button data-page="movers">Movers</button>
+      <button data-page="discovery">Discovery</button>
+      <button data-page="serp">SERP</button>
+      <button data-page="ai">AI Visibility</button>
+      <button data-page="costs">Costs</button>
+      <button data-page="settings">Settings</button>
+    </nav>
+    <select class="site-select" id="siteSelect"></select>
+  </header>
+  <main id="content"></main>
+
+  <script>
+    const $ = s => document.querySelector(s);
+    const $$ = s => document.querySelectorAll(s);
+    let currentSite = null;
+    let sites = [];
+
+    // API helper
+    async function api(path, opts = {}) {
+      const res = await fetch('/api' + path, {
+        ...opts,
+        headers: { 'Content-Type': 'application/json', ...opts.headers },
+        body: opts.body ? JSON.stringify(opts.body) : undefined
+      });
+      return res.json();
+    }
+
+    // Init
+    async function init() {
+      sites = await api('/sites');
+      const sel = $('#siteSelect');
+      sel.innerHTML = sites.map(s => `<option value="${s.id}">${s.name} (${s.domain})</option>`).join('');
+      if (sites.length) {
+        currentSite = sites[0];
+        sel.value = currentSite.id;
+      }
+      sel.onchange = () => {
+        currentSite = sites.find(s => s.id === +sel.value);
+        loadPage(activePage);
+      };
+      loadPage('ranks');
+    }
+
+    // Navigation
+    let activePage = 'ranks';
+    $$('nav button').forEach(btn => {
+      btn.onclick = () => {
+        $$('nav button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        loadPage(btn.dataset.page);
+      };
+    });
+
+    function loadPage(page) {
+      activePage = page;
+      const c = $('#content');
+      c.innerHTML = '<div class="loading">Loading...</div>';
+      const pages = { ranks: loadRanks, movers: loadMovers, discovery: loadDiscovery, serp: loadSerp, ai: loadAI, costs: loadCosts, settings: loadSettings };
+      if (pages[page]) pages[page]();
+    }
+
+    // ============ RANKINGS PAGE ============
+    async function loadRanks() {
+      if (!currentSite) return $('#content').innerHTML = '<div class="empty">No sites configured. Go to Settings to add one.</div>';
+      const data = await api(`/sites/${currentSite.id}/ranks`);
+      
+      let rows = '';
+      for (const kw of data) {
+        const latest = kw.checks[0];
+        const prev = kw.checks[1];
+        let changeHtml = '<span class="neutral">—</span>';
+        
+        if (latest && prev && latest.position && prev.position) {
+          const diff = prev.position - latest.position;
+          if (diff > 0) changeHtml = `<span class="up"><span class="arrow">▲</span>+${diff}</span>`;
+          else if (diff < 0) changeHtml = `<span class="down"><span class="arrow">▼</span>${diff}</span>`;
+          else changeHtml = '<span class="neutral">—</span>';
+        }
+
+        rows += `<tr>
+          <td><strong>${kw.keyword}</strong></td>
+          <td class="pos">${latest?.position ?? '—'}</td>
+          <td>${changeHtml}</td>
+          <td style="font-size:12px;color:var(--text2)">${latest?.checked_at ? new Date(latest.checked_at+'Z').toLocaleDateString() : '—'}</td>
+          <td>
+            <button class="btn btn-sm btn-ghost" onclick="checkKeyword(${kw.keyword_id})">Check Now</button>
+            <button class="btn btn-sm btn-ghost" onclick="showChart(${kw.keyword_id}, '${kw.keyword.replace(/'/g,"\\'")}')">📈</button>
+          </td>
+        </tr>`;
+      }
+
+      $('#content').innerHTML = `
+        <div class="flex-between mb">
+          <h2 style="color:var(--text)">Keyword Rankings — ${currentSite.name}</h2>
+          <button class="btn" onclick="runAllChecks()">🔄 Check All Keywords</button>
+        </div>
+        <div class="card">
+          <table>
+            <thead><tr><th>Keyword</th><th>Position</th><th>Change</th><th>Last Check</th><th>Actions</th></tr></thead>
+            <tbody>${rows || '<tr><td colspan="5" class="empty">No keywords tracked yet</td></tr>'}</tbody>
+          </table>
+        </div>
+        <div id="chartModal" class="hidden">
+          <div class="card">
+            <div class="flex-between mb"><h2 id="chartTitle">History</h2><button class="btn btn-sm btn-ghost" onclick="$('#chartModal').classList.add('hidden')">✕</button></div>
+            <div class="chart-container"><canvas id="rankChart"></canvas></div>
+          </div>
+        </div>
+      `;
+    }
+
+    let rankChart = null;
+    async function showChart(kwId, kwName) {
+      const data = await api(`/keywords/${kwId}/history`);
+      $('#chartModal').classList.remove('hidden');
+      $('#chartTitle').textContent = `Position History: ${kwName}`;
+      
+      if (rankChart) rankChart.destroy();
+      rankChart = new Chart($('#rankChart'), {
+        type: 'line',
+        data: {
+          labels: data.map(d => new Date(d.checked_at+'Z').toLocaleDateString()),
+          datasets: [{
+            label: 'Position',
+            data: data.map(d => d.position),
+            borderColor: '#f97316',
+            backgroundColor: 'rgba(249,115,22,0.1)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 4
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: {
+            y: { reverse: true, min: 1, title: { display: true, text: 'Position', color: '#94a3b8' }, grid: { color: '#2d3348' }, ticks: { color: '#94a3b8' } },
+            x: { grid: { color: '#2d3348' }, ticks: { color: '#94a3b8' } }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+
+    async function checkKeyword(kwId) {
+      const btn = event.target;
+      btn.disabled = true; btn.textContent = '...';
+      await api(`/keywords/${kwId}/check`, { method: 'POST' });
+      loadRanks();
+    }
+
+    async function runAllChecks() {
+      const btn = event.target;
+      btn.disabled = true; btn.textContent = '⏳ Running...';
+      await api('/run/rank-check', { method: 'POST' });
+      loadRanks();
+    }
+
+    // ============ MOVERS PAGE ============
+    async function loadMovers() {
+      if (!currentSite) return;
+      const data = await api(`/sites/${currentSite.id}/movers`);
+      
+      const rising = data.filter(d => d.change > 0);
+      const falling = data.filter(d => d.change < 0);
+
+      function moverRows(items) {
+        if (!items.length) return '<div class="empty">No movement detected yet. Run rank checks to start tracking.</div>';
+        return '<table><thead><tr><th>Keyword</th><th>Current</th><th>Previous</th><th>Change</th></tr></thead><tbody>' +
+          items.map(m => `<tr>
+            <td><strong>${m.keyword}</strong></td>
+            <td class="pos">${m.current}</td>
+            <td style="color:var(--text2)">${m.previous}</td>
+            <td><span class="badge ${m.change > 0 ? 'badge-green' : 'badge-red'}">${m.change > 0 ? '▲ +' : '▼ '}${Math.abs(m.change)}</span></td>
+          </tr>`).join('') + '</tbody></table>';
+      }
+
+      $('#content').innerHTML = `
+        <h2 style="color:var(--text);margin-bottom:20px">Rising & Falling Keywords — ${currentSite.name}</h2>
+        <div class="grid grid-2">
+          <div class="card"><h2>🟢 Rising</h2>${moverRows(rising)}</div>
+          <div class="card"><h2>🔴 Falling</h2>${moverRows(falling)}</div>
+        </div>
+      `;
+    }
+
+    // ============ DISCOVERY PAGE ============
+    async function loadDiscovery() {
+      if (!currentSite) return;
+      const data = await api(`/sites/${currentSite.id}/suggestions`);
+      
+      const rows = data.map(s => `<tr>
+        <td><strong>${s.keyword}</strong></td>
+        <td>${s.search_volume?.toLocaleString() ?? '—'}</td>
+        <td>${s.competition != null ? (s.competition * 100).toFixed(0) + '%' : '—'}</td>
+        <td>${s.cpc != null ? '$' + s.cpc.toFixed(2) : '—'}</td>
+        <td style="font-size:12px;color:var(--text2)">${s.discovered_at ? new Date(s.discovered_at+'Z').toLocaleDateString() : '—'}</td>
+      </tr>`).join('');
+
+      $('#content').innerHTML = `
+        <div class="flex-between mb">
+          <h2 style="color:var(--text)">Keyword Discovery — ${currentSite.name}</h2>
+          <button class="btn" onclick="runDiscovery()">🔍 Run Discovery</button>
+        </div>
+        <div class="card">
+          <h2>Emerging Opportunities</h2>
+          ${data.length ? `<table><thead><tr><th>Keyword</th><th>Search Volume</th><th>Competition</th><th>CPC</th><th>Discovered</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty">No suggestions yet. Click Run Discovery to find keyword opportunities.</div>'}
+        </div>
+      `;
+    }
+
+    async function runDiscovery() {
+      const btn = event.target;
+      btn.disabled = true; btn.textContent = '⏳ Running...';
+      await api('/run/discovery', { method: 'POST' });
+      loadDiscovery();
+    }
+
+    // ============ SERP PAGE ============
+    async function loadSerp() {
+      if (!currentSite) return;
+      const keywords = await api(`/sites/${currentSite.id}/keywords`);
+      
+      let kwOptions = keywords.map(k => `<option value="${k.id}">${k.keyword}</option>`).join('');
+      
+      $('#content').innerHTML = `
+        <h2 style="color:var(--text);margin-bottom:20px">SERP Snapshot — ${currentSite.name}</h2>
+        <div class="card">
+          <div class="flex mb">
+            <select id="serpKw" style="max-width:300px">${kwOptions}</select>
+            <button class="btn" onclick="loadSerpData()">View SERP</button>
+          </div>
+          <div id="serpResults"><div class="empty">Select a keyword and click View SERP</div></div>
+        </div>
+      `;
+    }
+
+    async function loadSerpData() {
+      const kwId = $('#serpKw').value;
+      if (!kwId) return;
+      const data = await api(`/keywords/${kwId}/serp`);
+      
+      if (!data.items?.length) {
+        $('#serpResults').innerHTML = '<div class="empty">No SERP data. Run a rank check first.</div>';
+        return;
+      }
+
+      const domain = currentSite.domain;
+      $('#serpResults').innerHTML = `
+        <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Last checked: ${data.checked_at ? new Date(data.checked_at+'Z').toLocaleString() : '—'}</p>
+        ${data.items.map(item => `
+          <div class="serp-item ${item.domain?.includes(domain) ? 'highlight' : ''}">
+            <span class="serp-pos">${item.position}</span>
+            <span class="serp-title">${item.title || '—'}</span>
+            ${item.domain?.includes(domain) ? '<span class="badge badge-orange" style="margin-left:8px">YOUR SITE</span>' : ''}
+            <div style="margin-left:40px">
+              <div class="serp-url">${item.url || ''}</div>
+              <div class="serp-desc">${item.description || ''}</div>
+            </div>
+          </div>
+        `).join('')}
+      `;
+    }
+
+    // ============ AI VISIBILITY PAGE ============
+    async function loadAI() {
+      if (!currentSite) return;
+      const queries = await api(`/sites/${currentSite.id}/ai-queries`);
+      const results = await api(`/sites/${currentSite.id}/ai-visibility`);
+
+      const queryRows = queries.map(q => `<tr>
+        <td>${q.query}</td>
+        <td><button class="btn btn-sm btn-danger" onclick="deleteAiQuery(${q.id})">✕</button></td>
+      </tr>`).join('');
+
+      const resultRows = results.map(r => `<tr>
+        <td>${r.query}</td>
+        <td>${r.model || '—'}</td>
+        <td><span class="badge ${r.mentioned ? 'badge-green' : 'badge-red'}">${r.mentioned ? 'Yes' : 'No'}</span></td>
+        <td style="font-size:12px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.context || '—'}</td>
+        <td style="font-size:12px;color:var(--text2)">${r.checked_at ? new Date(r.checked_at+'Z').toLocaleString() : '—'}</td>
+      </tr>`).join('');
+
+      $('#content').innerHTML = `
+        <h2 style="color:var(--text);margin-bottom:20px">AI Visibility — ${currentSite.name}</h2>
+        <div class="grid grid-2">
+          <div class="card">
+            <h2>Test Queries</h2>
+            <div class="flex mb">
+              <input id="newAiQuery" placeholder="e.g., best one piece tcg marketplace">
+              <button class="btn" onclick="addAiQuery()">Add</button>
+            </div>
+            ${queries.length ? `<table><thead><tr><th>Query</th><th></th></tr></thead><tbody>${queryRows}</tbody></table>` : '<div class="empty">No queries configured</div>'}
+          </div>
+          <div class="card">
+            <h2>Results Timeline</h2>
+            ${results.length ? `<table><thead><tr><th>Query</th><th>Model</th><th>Mentioned</th><th>Context</th><th>Date</th></tr></thead><tbody>${resultRows}</tbody></table>` : '<div class="empty">No results yet. AI querying framework ready — actual checks coming soon.</div>'}
+          </div>
+        </div>
+      `;
+    }
+
+    async function addAiQuery() {
+      const input = $('#newAiQuery');
+      if (!input.value.trim()) return;
+      await api(`/sites/${currentSite.id}/ai-queries`, { method: 'POST', body: { query: input.value.trim() } });
+      loadAI();
+    }
+
+    async function deleteAiQuery(id) {
+      await api(`/ai-queries/${id}`, { method: 'DELETE' });
+      loadAI();
+    }
+
+    // ============ COSTS PAGE ============
+    async function loadCosts() {
+      const data = await api('/costs');
+      const pct = Math.min((data.thisMonth / data.budget) * 100, 100);
+      
+      const rows = data.recent.map(c => `<tr>
+        <td style="font-size:12px">${c.endpoint}</td>
+        <td>$${c.cost.toFixed(4)}</td>
+        <td style="font-size:12px;color:var(--text2)">${new Date(c.created_at+'Z').toLocaleString()}</td>
+      </tr>`).join('');
+
+      $('#content').innerHTML = `
+        <h2 style="color:var(--text);margin-bottom:20px">API Cost Tracker</h2>
+        <div class="grid grid-4">
+          <div class="card stat-card"><div class="stat-val">$${data.today.toFixed(4)}</div><div class="stat-label">Today</div></div>
+          <div class="card stat-card"><div class="stat-val">$${data.thisWeek.toFixed(4)}</div><div class="stat-label">This Week</div></div>
+          <div class="card stat-card"><div class="stat-val">$${data.thisMonth.toFixed(4)}</div><div class="stat-label">This Month</div></div>
+          <div class="card stat-card"><div class="stat-val">$${data.total.toFixed(4)}</div><div class="stat-label">All Time</div></div>
+        </div>
+        <div class="card">
+          <h2>Monthly Budget</h2>
+          <div class="flex-between">
+            <span>$${data.thisMonth.toFixed(2)} / $${data.budget.toFixed(2)}</span>
+            <span style="color:${pct > 80 ? 'var(--red)' : 'var(--text2)'}">${pct.toFixed(0)}%</span>
+          </div>
+          <div class="cost-bar"><div class="cost-fill" style="width:${pct}%;${pct > 80 ? 'background:var(--red)' : ''}"></div></div>
+        </div>
+        <div class="card">
+          <h2>Recent API Calls</h2>
+          ${data.recent.length ? `<table><thead><tr><th>Endpoint</th><th>Cost</th><th>Time</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty">No API calls recorded yet</div>'}
+        </div>
+      `;
+    }
+
+    // ============ SETTINGS PAGE ============
+    async function loadSettings() {
+      const settings = await api('/settings');
+      const allSites = await api('/sites');
+      let kwSections = '';
+
+      for (const site of allSites) {
+        const kws = await api(`/sites/${site.id}/keywords`);
+        kwSections += `
+          <div class="card">
+            <div class="flex-between mb">
+              <h2>🌐 ${site.name} (${site.domain})</h2>
+              <button class="btn btn-sm btn-danger" onclick="deleteSite(${site.id})">Delete Site</button>
+            </div>
+            <div class="flex mb">
+              <input id="newKw-${site.id}" placeholder="Add keyword...">
+              <button class="btn btn-sm" onclick="addKeyword(${site.id})">Add</button>
+            </div>
+            <div>${kws.map(k => `<span class="tag">${k.keyword} <span style="cursor:pointer;color:var(--red)" onclick="deleteKeyword(${k.id})">✕</span></span>`).join(' ')}</div>
+          </div>
+        `;
+      }
+
+      $('#content').innerHTML = `
+        <h2 style="color:var(--text);margin-bottom:20px">Settings</h2>
+        <div class="grid grid-2">
+          <div class="card">
+            <h2>DataForSEO Credentials</h2>
+            <label style="font-size:12px;color:var(--text2)">Login</label>
+            <input id="s-login" value="${settings.dataforseo_login || ''}" class="mb">
+            <label style="font-size:12px;color:var(--text2)">Password</label>
+            <input id="s-password" value="${settings.dataforseo_password || ''}" type="password" class="mb">
+            <button class="btn" onclick="saveSettings()">Save Credentials</button>
+          </div>
+          <div class="card">
+            <h2>Schedule</h2>
+            <label style="font-size:12px;color:var(--text2)">Rank Check Cron</label>
+            <input id="s-rank-cron" value="${settings.rank_check_cron || '0 6 * * *'}" class="mb">
+            <label style="font-size:12px;color:var(--text2)">Discovery Cron</label>
+            <input id="s-disc-cron" value="${settings.discovery_cron || '0 7 * * 1'}" class="mb">
+            <label style="font-size:12px;color:var(--text2)">AI Visibility Cron</label>
+            <input id="s-ai-cron" value="${settings.ai_visibility_cron || '0 8 * * 1'}" class="mb">
+            <label style="font-size:12px;color:var(--text2)">Monthly Budget Alert ($)</label>
+            <input id="s-budget" value="${settings.budget_alert || '50'}" type="number" class="mb">
+            <button class="btn" onclick="saveSchedule()">Save Schedule</button>
+          </div>
+        </div>
+        <div class="card" style="margin-top:20px">
+          <h2>Add New Site</h2>
+          <div class="flex">
+            <input id="newSiteName" placeholder="Site name" style="max-width:200px">
+            <input id="newSiteDomain" placeholder="domain.com" style="max-width:200px">
+            <button class="btn" onclick="addSite()">Add Site</button>
+          </div>
+        </div>
+        ${kwSections}
+      `;
+    }
+
+    async function saveSettings() {
+      await api('/settings', { method: 'PUT', body: {
+        dataforseo_login: $('#s-login').value,
+        dataforseo_password: $('#s-password').value
+      }});
+      alert('Credentials saved!');
+    }
+
+    async function saveSchedule() {
+      await api('/settings', { method: 'PUT', body: {
+        rank_check_cron: $('#s-rank-cron').value,
+        discovery_cron: $('#s-disc-cron').value,
+        ai_visibility_cron: $('#s-ai-cron').value,
+        budget_alert: $('#s-budget').value
+      }});
+      alert('Schedule saved & scheduler restarted!');
+    }
+
+    async function addSite() {
+      const name = $('#newSiteName').value.trim();
+      const domain = $('#newSiteDomain').value.trim();
+      if (!name || !domain) return alert('Name and domain required');
+      await api('/sites', { method: 'POST', body: { name, domain } });
+      sites = await api('/sites');
+      const sel = $('#siteSelect');
+      sel.innerHTML = sites.map(s => `<option value="${s.id}">${s.name} (${s.domain})</option>`).join('');
+      loadSettings();
+    }
+
+    async function deleteSite(id) {
+      if (!confirm('Delete this site and all its data?')) return;
+      await api(`/sites/${id}`, { method: 'DELETE' });
+      sites = await api('/sites');
+      const sel = $('#siteSelect');
+      sel.innerHTML = sites.map(s => `<option value="${s.id}">${s.name} (${s.domain})</option>`).join('');
+      currentSite = sites[0] || null;
+      if (currentSite) sel.value = currentSite.id;
+      loadSettings();
+    }
+
+    async function addKeyword(siteId) {
+      const input = $(`#newKw-${siteId}`);
+      if (!input.value.trim()) return;
+      await api(`/sites/${siteId}/keywords`, { method: 'POST', body: { keyword: input.value.trim() } });
+      loadSettings();
+    }
+
+    async function deleteKeyword(id) {
+      await api(`/keywords/${id}`, { method: 'DELETE' });
+      loadSettings();
+    }
+
+    init();
+  </script>
+</body>
+</html>
