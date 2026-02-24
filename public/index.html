@@ -337,7 +337,7 @@
       const rows = data.map(s => `<tr>
         <td><strong>${s.keyword}</strong></td>
         <td>${s.search_volume?.toLocaleString() ?? '—'}</td>
-        <td>${s.competition != null ? (s.competition * 100).toFixed(0) + '%' : '—'}</td>
+        <td>${s.competition != null ? (typeof s.competition === 'number' ? (s.competition * 100).toFixed(0) + '%' : s.competition) : '—'}</td>
         <td>${s.cpc != null ? '$' + s.cpc.toFixed(2) : '—'}</td>
         <td style="font-size:12px;color:var(--text2)">${s.discovered_at ? new Date(s.discovered_at+'Z').toLocaleDateString() : '—'}</td>
       </tr>`).join('');
